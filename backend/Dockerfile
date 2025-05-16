@@ -1,14 +1,14 @@
 ﻿FROM python:3.9-slim
 
-# Set working directory
+# set working dir
 WORKDIR /app
 
-# Install dependencies
+# install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy app code
+# copy service code
 COPY . .
 
-# Default command
+# run Uvicorn
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
