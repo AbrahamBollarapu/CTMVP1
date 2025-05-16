@@ -69,7 +69,7 @@ jobs:
           npm install -g newman@^5.0.0
           newman run postman/collection.json \
             --env-var "BASE_URL=http://localhost:8001" \
-            --failfast
+            --bail
 
       # 7) Tear down the test container (always)
       - name: Stop and clean up test container
