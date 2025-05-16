@@ -3,72 +3,84 @@
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
+  # pull_request:
+  #   branches: [ master ]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    services:
+      # docker-in-docker gives you full control over the daemon version,
+      # but on ubuntu-latest the built-in Docker is enough for most builds.
+      docker:
+        image: docker:20.10-dind
+        options: --privileged
+
     steps:
+      # 1) Grab your code
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      - name: Set up Docker (daemon & Buildx)
-        uses: docker/setup-docker@v2
-        with:
-          buildx: true
-          start-docker: true
+      # 2) Install Buildx (for advanced builds / caching)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
+      # 3) Authenticate to Docker Hub (secrets must already exist)
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Docker image
+      # 4) Build your image, tag = commit SHA
+      - name: Build docker image
         run: |
           docker build \
             --tag abrahambollarapu/auth-service:${{ github.sha }} \
             -f auth-service/Dockerfile \
             auth-service
 
-      - name: Run Auth container
+      # 5) Spin it up for a quick smoke-test on port 8001
+      - name: Smoke-run container
         run: |
           docker run -d \
-            --name auth-service-test \
+            --name auth-smoke \
             -p 8001:8001 \
             abrahambollarapu/auth-service:${{ github.sha }}
+          # wait up to 30s for “running” status
           for i in $(seq 1 10); do
-            if [ "$(docker inspect --format='{{.State.Status}}' auth-service-test)" = "running" ]; then
-              echo "✓ Container is running"
+            if [ "$(docker inspect --format='{{.State.Status}}' auth-smoke)" = "running" ]; then
+              echo "✅ Running"
               exit 0
             fi
             sleep 3
           done
-          echo "❌ Container failed to start!"
-          docker logs auth-service-test
+          echo "❌ Container never started"
+          docker logs auth-smoke
           exit 1
 
-      - name: Run Postman contract tests
+      # 6) Run your Postman contract tests via Newman
+      - name: Run contract tests
         run: |
           npm install -g newman
           newman run postman/collection.json \
-            --env-var "BASE_URL=http://localhost:8001" \
+            --env-var BASE_URL=http://localhost:8001 \
             --bail
 
-      - name: Stop & clean up test container
+      # 7) Always tear down
+      - name: Cleanup
         if: always()
         run: |
-          docker stop auth-service-test || true
-          docker rm   auth-service-test || true
+          docker stop auth-smoke || true
+          docker rm -f auth-smoke || true
 
+      # 8) If everything passed, tag “latest” and push both
       - name: Push to Docker Hub
         if: success()
         run: |
-          docker tag abrahambollarapu/auth-service:${{ github.sha }} abrahambollarapu/auth-service:latest
+          docker tag abrahambollarapu/auth-service:${{ github.sha }} \
+                     abrahambollarapu/auth-service:latest
           docker push abrahambollarapu/auth-service:${{ github.sha }}
           docker push abrahambollarapu/auth-service:latest
