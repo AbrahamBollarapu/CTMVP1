@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Response, Request, HTTPException, status, Body
+﻿from fastapi import APIRouter, Response, Request, HTTPException, status, Body
 from fastapi.responses import JSONResponse
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
@@ -51,7 +51,6 @@ async def login(response: Response, creds: LoginRequest):
         }
     finally:
         db.close()
-
 
 def get_current_user(token: str):
     try:
