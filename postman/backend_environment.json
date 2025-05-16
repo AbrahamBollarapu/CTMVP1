@@ -1,0 +1,12 @@
+﻿{
+  "id": "auth-env",
+  "name": "Auth Service Env",
+  "values": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8001",
+      "enabled": true
+    }
+  ],
+  "schema": "https://schema.getpostman.com/json/collection/v2.1.0/environment.json"
+}
