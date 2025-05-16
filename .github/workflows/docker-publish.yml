@@ -1,4 +1,4 @@
-﻿name: Build & Publish Auth Service
+﻿name: Build & Publish Auth + Backend Services
 
 on:
   push:
@@ -12,8 +12,6 @@ jobs:
     timeout-minutes: 30
 
     services:
-      # docker-in-docker gives you full control over the daemon version,
-      # but on ubuntu-latest the built-in Docker is enough for most builds.
       docker:
         image: docker:20.10-dind
         options: --privileged
@@ -27,60 +25,101 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # 3) Authenticate to Docker Hub (secrets must already exist)
+      # 3) Authenticate to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 4) Build your image, tag = commit SHA
-      - name: Build docker image
+      # 4) Build Auth service image
+      - name: Build Auth image
         run: |
           docker build \
             --tag abrahambollarapu/auth-service:${{ github.sha }} \
             -f auth-service/Dockerfile \
             auth-service
 
-      # 5) Spin it up for a quick smoke-test on port 8001
-      - name: Smoke-run container
+      # 5) Smoke-test Auth service
+      - name: Smoke-run Auth container
         run: |
-          docker run -d \
-            --name auth-smoke \
-            -p 8001:8001 \
-            abrahambollarapu/auth-service:${{ github.sha }}
-          # wait up to 30s for “running” status
+          docker run -d --name auth-smoke -p 8001:8001 abrahambollarapu/auth-service:${{ github.sha }}
           for i in $(seq 1 10); do
             if [ "$(docker inspect --format='{{.State.Status}}' auth-smoke)" = "running" ]; then
-              echo "✅ Running"
-              exit 0
+              echo "✅ auth-service running"
+              break
             fi
             sleep 3
           done
-          echo "❌ Container never started"
-          docker logs auth-smoke
-          exit 1
+          if [ "$(docker inspect --format='{{.State.Status}}' auth-smoke)" != "running" ]; then
+            echo "❌ auth-service failed to start"
+            docker logs auth-smoke
+            exit 1
+          fi
 
-      # 6) Run your Postman contract tests via Newman
-      - name: Run contract tests
+      # 6) Run Auth Newman tests
+      - name: Run Auth contract tests
         run: |
           npm install -g newman
           newman run postman/collection.json \
             --env-var BASE_URL=http://localhost:8001 \
             --bail
 
-      # 7) Always tear down
-      - name: Cleanup
+      # 7) Tear down Auth container
+      - name: Cleanup Auth container
         if: always()
         run: |
           docker stop auth-smoke || true
-          docker rm -f auth-smoke || true
+          docker rm   auth-smoke || true
 
-      # 8) If everything passed, tag “latest” and push both
+      # 8) Build Backend service image
+      - name: Build Backend image
+        run: |
+          docker build \
+            --tag abrahambollarapu/backend:${{ github.sha }} \
+            -f backend/Dockerfile \
+            backend
+
+      # 9) Smoke-test Backend service
+      - name: Smoke-run Backend container
+        run: |
+          docker run -d --name backend-smoke -p 8000:8000 abrahambollarapu/backend:${{ github.sha }}
+          for i in $(seq 1 10); do
+            if [ "$(docker inspect --format='{{.State.Status}}' backend-smoke)" = "running" ]; then
+              echo "✅ backend running"
+              break
+            fi
+            sleep 3
+          done
+          if [ "$(docker inspect --format='{{.State.Status}}' backend-smoke)" != "running" ]; then
+            echo "❌ backend failed to start"
+            docker logs backend-smoke
+            exit 1
+          fi
+
+      # 10) Run Backend Newman tests
+      - name: Run Backend contract tests
+        run: |
+          npm install -g newman
+          newman run backend/postman/collection.json \
+            --environment backend/postman/environment.json \
+            --bail
+
+      # 11) Tear down Backend container
+      - name: Cleanup Backend container
+        if: always()
+        run: |
+          docker stop backend-smoke || true
+          docker rm   backend-smoke || true
+
+      # 12) Push both images to Docker Hub
       - name: Push to Docker Hub
         if: success()
         run: |
-          docker tag abrahambollarapu/auth-service:${{ github.sha }} \
-                     abrahambollarapu/auth-service:latest
+          docker tag abrahambollarapu/auth-service:${{ github.sha }}  abrahambollarapu/auth-service:latest
           docker push abrahambollarapu/auth-service:${{ github.sha }}
           docker push abrahambollarapu/auth-service:latest
+
+          docker tag abrahambollarapu/backend:${{ github.sha }}       abrahambollarapu/backend:latest
+          docker push abrahambollarapu/backend:${{ github.sha }}
+          docker push abrahambollarapu/backend:latest
