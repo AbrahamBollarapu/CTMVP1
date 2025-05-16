@@ -10,8 +10,10 @@ jobs:
     services:
       docker:
         image: docker:20.10-dind
-        privileged: true
-        options: --entrypoint ''
+        options:
+          - --privileged
+          - --entrypoint
+          - ''
     steps:
       - uses: actions/checkout@v4
 
