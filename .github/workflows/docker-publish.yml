@@ -66,6 +66,7 @@ jobs:
       - name: Run Postman contract tests
         run: |
           npm install -g newman
+          npm install -g newman@^5.0.0
           newman run postman/collection.json \
             --env-var "BASE_URL=http://localhost:8001" \
             --failfast
