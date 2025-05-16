@@ -1,6 +1,6 @@
-fastapi
+﻿fastapi
 uvicorn[standard]
 sqlalchemy
 pydantic
+python-jose
 passlib[bcrypt]
-pyjwt
