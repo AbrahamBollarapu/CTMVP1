@@ -1,45 +1,32 @@
 ﻿# .github/workflows/docker-publish.yml
-
 name: Build & Publish Auth Service
 
 on:
   push:
     branches: [ master ]
-  # Uncomment to run on PRs as well:
-  # pull_request:
-  #   branches: [ master ]
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    services:
-      docker:
-        image: docker:20.10-dind
-        options: --privileged
-
     steps:
-      # 1) Check out the repo (only the latest commit)
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      # 2) Start Docker daemon + install Buildx
       - name: Set up Docker (daemon & Buildx)
-        uses: docker/setup-docker@v2
+        uses: docker/setup-docker@v3
         with:
           buildx: true
           start-docker: true
 
-      # 3) Authenticate with Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 4) Build the Auth service image, tag by commit SHA
       - name: Build Docker image
         run: |
           docker build \
@@ -47,32 +34,22 @@ jobs:
             -f auth-service/Dockerfile \
             auth-service
 
-      # 5) Spin up the container as a smoke test
       - name: Run Auth container
         run: |
-          docker run -d \
-            --name auth-service-test \
-            -p 8001:8001 \
-            abrahambollarapu/auth-service:${{ github.sha }}
-
-          # Wait up to 30s for "running" status
+          docker run -d --name auth-service-test -p 8001:8001 abrahambollarapu/auth-service:${{ github.sha }}
           for i in $(seq 1 10); do
-            status=$(docker inspect --format='{{.State.Status}}' auth-service-test)
-            if [ "$status" = "running" ]; then
+            if [ "$(docker inspect --format='{{.State.Status}}' auth-service-test)" = "running" ]; then
               echo "✓ auth-service-test is running"
               break
             fi
             sleep 3
           done
-
-          # Final healthcheck
           if [ "$(docker inspect --format='{{.State.Status}}' auth-service-test)" != "running" ]; then
             echo "❌ Container failed to start!"
             docker logs auth-service-test
             exit 1
           fi
 
-      # 6) Execute your Postman contract tests via Newman
       - name: Run Postman contract tests
         run: |
           npm install -g newman
@@ -80,19 +57,15 @@ jobs:
             --env-var "BASE_URL=http://localhost:8001" \
             --failfast
 
-      # 7) Tear down the test container (always)
-      - name: Stop and clean up test container
+      - name: Stop & clean up test container
         if: always()
         run: |
           docker stop auth-service-test || true
-          docker rm -f auth-service-test || true
+          docker rm -f  auth-service-test || true
 
-      # 8) On success, tag & push to Docker Hub
       - name: Push to Docker Hub
         if: success()
         run: |
-          docker tag \
-            abrahambollarapu/auth-service:${{ github.sha }} \
-            abrahambollarapu/auth-service:latest
+          docker tag abrahambollarapu/auth-service:${{ github.sha }} abrahambollarapu/auth-service:latest
           docker push abrahambollarapu/auth-service:${{ github.sha }}
           docker push abrahambollarapu/auth-service:latest
