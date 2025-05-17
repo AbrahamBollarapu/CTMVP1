@@ -1,30 +1,21 @@
-﻿name: Build & Publish Services
+﻿# .github/workflows/docker-publish.yml
+name: Build & Publish Services
 
 on:
   push:
-    branches: [ master ]
-  workflow_dispatch:   # ← allows manual “Run workflow” in GitHub UI
+    branches: [master]
+  workflow_dispatch:
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    services:
-      docker:
-        image: docker:20.10-dind
-        options: --privileged
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-
-      - name: Debug: print DOCKERHUB_USERNAME
-        run: |
-          echo "⤷ will push to namespace ${{ secrets.DOCKERHUB_USERNAME }}"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -35,39 +26,25 @@ jobs:
       ########################################
       # Auth service
       ########################################
-
-      - name: Build Auth image
-        run: |
-          docker build \
-            --tag ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:${{ github.sha }} \
-            -f auth-service/Dockerfile \
-            auth-service
-
-      - name: Push Auth image
-        if: success()
-        run: |
-          docker tag \
-            ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:${{ github.sha }} \
+      - name: Build & push Auth image
+        uses: docker/build-push-action@v3
+        with:
+          context: auth-service
+          file: auth-service/Dockerfile
+          push: true
+          tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:${{ github.sha }}
 
       ########################################
       # Backend service
       ########################################
-
-      - name: Build Backend image
-        run: |
-          docker build \
-            --tag ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }} \
-            -f backend/Dockerfile \
-            backend
-
-      - name: Push Backend image
-        if: success()
-        run: |
-          docker tag \
-            ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }} \
+      - name: Build & push Backend image
+        uses: docker/build-push-action@v3
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: true
+          tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
