@@ -40,7 +40,7 @@ jobs:
       - name: Build Auth image
         run: |
           docker build \
-            --tag abrahambollarapu/auth-service:${{ github.sha }} \
+            --tag bollarapuabraham86/auth-service:${{ github.sha }} \
             -f auth-service/Dockerfile \
             auth-service
 
@@ -50,7 +50,7 @@ jobs:
           docker run -d \
             --name auth-smoke \
             -p 8001:8001 \
-            abrahambollarapu/auth-service:${{ github.sha }}
+            bollarapuabraham86/auth-service:${{ github.sha }}
           for i in $(seq 1 10); do
             if [ "$(docker inspect --format='{{.State.Status}}' auth-smoke)" = "running" ]; then
               echo "✅ auth-smoke is running"
@@ -83,10 +83,10 @@ jobs:
       - name: Push Auth image
         if: success()
         run: |
-          docker tag abrahambollarapu/auth-service:${{ github.sha }} \
-                     abrahambollarapu/auth-service:latest
-          docker push abrahambollarapu/auth-service:${{ github.sha }}
-          docker push abrahambollarapu/auth-service:latest
+          docker tag bollarapuabraham86/auth-service:${{ github.sha }} \
+                     bollarapuabraham86/auth-service:latest
+          docker push bollarapuabraham86/auth-service:${{ github.sha }}
+          docker push bollarapuabraham86/auth-service:latest
 
       ########################################
       # Backend service
@@ -96,7 +96,7 @@ jobs:
       - name: Build Backend image
         run: |
           docker build \
-            --tag abrahambollarapu/backend:${{ github.sha }} \
+            --tag bollarapuabraham86/backend:${{ github.sha }} \
             -f backend/Dockerfile \
             backend
 
@@ -106,7 +106,7 @@ jobs:
           docker run -d \
             --name backend-smoke \
             -p 8000:8000 \
-            abrahambollarapu/backend:${{ github.sha }}
+            bollarapuabraham86/backend:${{ github.sha }}
           for i in $(seq 1 10); do
             if [ "$(docker inspect --format='{{.State.Status}}' backend-smoke)" = "running" ]; then
               echo "✅ backend-smoke is running"
@@ -139,7 +139,7 @@ jobs:
       - name: Push Backend image
         if: success()
         run: |
-          docker tag abrahambollarapu/backend:${{ github.sha }} \
-                     abrahambollarapu/backend:latest
-          docker push abrahambollarapu/backend:${{ github.sha }}
-          docker push abrahambollarapu/backend:latest
+          docker tag bollarapuabraham86/backend:${{ github.sha }} \
+                     bollarapuabraham86/backend:latest
+          docker push bollarapuabraham86/backend:${{ github.sha }}
+          docker push bollarapuabraham86/backend:latest
