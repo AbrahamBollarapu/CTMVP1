@@ -1,18 +1,20 @@
-﻿# .github/workflows/docker-publish.yml
-name: Build & Publish Services
+﻿name: Build & Publish Services
 
+# trigger on pushes to master or manual dispatch
 on:
   push:
-    branches: [master]
+    branches:
+      - master
   workflow_dispatch:
 
 jobs:
-  build-and-publish:
+  build-and-push:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -23,28 +25,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      ########################################
-      # Auth service
-      ########################################
-      - name: Build & push Auth image
-        uses: docker/build-push-action@v3
+      # Build & push both auth and backend in one go
+      - name: Build & Push images
+        uses: docker/build-push-action@v4
         with:
-          context: auth-service
-          file: auth-service/Dockerfile
+          context: .
           push: true
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:${{ github.sha }}
-
-      ########################################
-      # Backend service
-      ########################################
-      - name: Build & push Backend image
-        uses: docker/build-push-action@v3
-        with:
-          context: backend
-          file: backend/Dockerfile
-          push: true
-          tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
+          # assume your Dockerfiles live in auth-service/ and backend/
+          build-args: |
+            AUTH_CONTEXT=auth-service
+            BACKEND_CONTEXT=backend
+          # if you need multiple contexts, you can do:
+          # platforms: linux/amd64,linux/arm64
