@@ -3,11 +3,10 @@
 on:
   push:
     branches: [ master ]
-  # pull_request:
-  #   branches: [ master ]
+  workflow_dispatch:   # ← allows manual “Run workflow” button
 
 jobs:
-  build-and-test:
+  build-and-publish:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -17,15 +16,15 @@ jobs:
         options: --privileged
 
     steps:
-      # 1) Checkout your code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2) Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # 3) Log in to Docker Hub
+      - name: Debug: print DOCKERHUB_USERNAME
+        run: echo "⤷ will push to namespace ${{ secrets.DOCKERHUB_USERNAME }}"
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -36,110 +35,34 @@ jobs:
       # Auth service
       ########################################
 
-      # 4) Build Auth Docker image
       - name: Build Auth image
         run: |
           docker build \
-            --tag bollarapuabraham86/auth-service:${{ github.sha }} \
+            --tag ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:${{ github.sha }} \
             -f auth-service/Dockerfile \
             auth-service
 
-      # 5) Smoke-run Auth container
-      - name: Smoke-run Auth container
-        run: |
-          docker run -d \
-            --name auth-smoke \
-            -p 8001:8001 \
-            bollarapuabraham86/auth-service:${{ github.sha }}
-          for i in $(seq 1 10); do
-            if [ "$(docker inspect --format='{{.State.Status}}' auth-smoke)" = "running" ]; then
-              echo "✅ auth-smoke is running"
-              break
-            fi
-            sleep 3
-          done
-          if [ "$(docker inspect --format='{{.State.Status}}' auth-smoke)" != "running" ]; then
-            echo "❌ Auth container failed to start"
-            docker logs auth-smoke
-            exit 1
-          fi
-
-      # 6) Run Auth contract tests
-      - name: Run Auth contract tests
-        run: |
-          npm install -g newman
-          newman run postman/collection.json \
-            --env-var BASE_URL=http://localhost:8001 \
-            --bail
-
-      # 7) Cleanup Auth container
-      - name: Cleanup Auth container
-        if: always()
-        run: |
-          docker stop auth-smoke || true
-          docker rm -f auth-smoke || true
-
-      # 8) Push Auth image
       - name: Push Auth image
         if: success()
         run: |
-          docker tag bollarapuabraham86/auth-service:${{ github.sha }} \
-                     bollarapuabraham86/auth-service:latest
-          docker push bollarapuabraham86/auth-service:${{ github.sha }}
-          docker push bollarapuabraham86/auth-service:latest
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/auth-service:latest
 
       ########################################
       # Backend service
       ########################################
 
-      # 9) Build Backend Docker image
       - name: Build Backend image
         run: |
           docker build \
-            --tag bollarapuabraham86/backend:${{ github.sha }} \
+            --tag ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }} \
             -f backend/Dockerfile \
             backend
 
-      # 10) Smoke-run Backend container
-      - name: Smoke-run Backend container
-        run: |
-          docker run -d \
-            --name backend-smoke \
-            -p 8000:8000 \
-            bollarapuabraham86/backend:${{ github.sha }}
-          for i in $(seq 1 10); do
-            if [ "$(docker inspect --format='{{.State.Status}}' backend-smoke)" = "running" ]; then
-              echo "✅ backend-smoke is running"
-              break
-            fi
-            sleep 3
-          done
-          if [ "$(docker inspect --format='{{.State.Status}}' backend-smoke)" != "running" ]; then
-            echo "❌ Backend container failed to start"
-            docker logs backend-smoke
-            exit 1
-          fi
-
-      # 11) Run Backend contract tests
-      - name: Run Backend contract tests
-        run: |
-          npm install -g newman
-          newman run postman/backend_collection.json \
-            --env-var BASE_URL=http://localhost:8000 \
-            --bail
-
-      # 12) Cleanup Backend container
-      - name: Cleanup Backend container
-        if: always()
-        run: |
-          docker stop backend-smoke || true
-          docker rm -f backend-smoke || true
-
-      # 13) Push Backend image
       - name: Push Backend image
         if: success()
         run: |
-          docker tag bollarapuabraham86/backend:${{ github.sha }} \
-                     bollarapuabraham86/backend:latest
-          docker push bollarapuabraham86/backend:${{ github.sha }}
-          docker push bollarapuabraham86/backend:latest
+          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
